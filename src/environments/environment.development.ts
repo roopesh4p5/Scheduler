@@ -8,6 +8,10 @@ export const environment = {
         appId: "1:401417226409:web:2379c493de1e0cfc36c1b8"
       }
 };
+
+
+
+
 // firebaseConfig.js
 // import { initializeApp } from "firebase/app";
 

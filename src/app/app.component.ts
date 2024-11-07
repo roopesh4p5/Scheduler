@@ -6,11 +6,12 @@ import { SideNavbarComponent } from './layout/side-navbar/side-navbar.component'
 import { AuthService } from './auth/auth.service';
 import { HttpClientModule } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FullCalendarModule } from '@fullcalendar/angular';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, HeaderComponent, SideNavbarComponent, HttpClientModule],
+  imports: [RouterOutlet, HeaderComponent, SideNavbarComponent, HttpClientModule,FullCalendarModule],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })

@@ -10,13 +10,15 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { AngularFirestore, AngularFirestoreCollection } from '@angular/fire/compat/firestore';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [HttpClientModule, FullCalendarModule,FormsModule],
+  imports: [HttpClientModule, FullCalendarModule, FormsModule, CommonModule],
   templateUrl: './add-event.component.html',
-  styleUrl: './add-event.component.scss'
+  styleUrls: ['./add-event.component.scss']
 })
 export class AddEventComponent implements OnInit, AfterViewInit {
   @ViewChild('calendar') calendarComponent!: FullCalendarComponent;
@@ -30,11 +32,8 @@ export class AddEventComponent implements OnInit, AfterViewInit {
     email: ''
   };
 
-  
-  events: EventInput[] = [
-    { title: 'MAKARA SANKRANTI', start: '2024-01-15', allDay: true, backgroundColor: 'green' },
-    { title: 'REPUBLIC DAY', start: '2024-01-26', allDay: true, backgroundColor: 'green' },
-  ];
+  events: EventInput[] = [];
+  eventCollection: AngularFirestoreCollection<EventInput>;
 
   calendarOptions: CalendarOptions = {
     plugins: [
@@ -70,10 +69,12 @@ export class AddEventComponent implements OnInit, AfterViewInit {
     eventClick: this.handleEventClick.bind(this)
   };
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private afs: AngularFirestore) {
+    this.eventCollection = this.afs.collection<EventInput>('events');
+  }
 
   ngOnInit(): void {
-    this.loadEventsFromServer();
+    this.loadEventsFromFirestore();
   }
 
   ngAfterViewInit() {
@@ -81,25 +82,10 @@ export class AddEventComponent implements OnInit, AfterViewInit {
     window.addEventListener('resize', this.checkScreenWidth.bind(this));
   }
 
-  loadEventsFromServer() {
-    this.fetchAvailableSlots().subscribe({
-      next: (data) => {
-        if (data && Array.isArray(data)) {
-          const mappedEvents = data.map((event) => ({
-            id: event.id,
-            title: event.title,
-            start: event.start,
-            end: event.end
-          }));
-          
-          if (this.calendarComponent) {
-            const calendarApi = this.calendarComponent.getApi();
-            calendarApi.removeAllEvents();
-            calendarApi.addEventSource(mappedEvents);
-          }
-        }
-      },
-      error: (err) => console.error('Error fetching events:', err)
+  loadEventsFromFirestore() {
+    this.eventCollection.valueChanges().subscribe((events) => {
+      this.events = events;
+      this.calendarOptions.events = this.events;
     });
   }
 
@@ -114,73 +100,26 @@ export class AddEventComponent implements OnInit, AfterViewInit {
   }
 
   handleDateClick(arg: any) {
-    // const clickedDate = new Date(arg.date);
-    // if (clickedDate.getDay() === 0 || clickedDate.getDay() === 6) {
-    //   alert('Event creation is not allowed on weekends.');
-    //   return;
-    // }
-
-    // const title = prompt('Enter event title:');
-    // if (title) {
-    //   const startTime = prompt('Enter start time (HH:mm):');
-    //   const endTime = prompt('Enter end time (HH:mm):');
-    //   if (startTime && endTime && this.isValidTimeFormat(startTime) && this.isValidTimeFormat(endTime)) {
-    //     const startDateTime = `${arg.dateStr}T${startTime}:00`;
-    //     const endDateTime = `${arg.dateStr}T${endTime}:00`;
-    //     const newEvent: EventInput = { title, start: startDateTime, end: endDateTime };
-    //     this.events = [...this.events, newEvent];
-    //     if (this.calendarComponent) {
-    //       this.calendarComponent.getApi().addEvent(newEvent);
-    //     }
-    //     localStorage.setItem('events', JSON.stringify(this.events));
-    //   } else {
-    //     alert('Invalid input. Please enter both start and end times in HH:mm format');
-    //   }
-    // }
-
- 
-      const clickedDate = new Date(arg.date);
+    const clickedDate = new Date(arg.date);
     
-      // Prevent event creation on weekends
-      if (clickedDate.getDay() === 0 || clickedDate.getDay() === 6) {
-        alert('Event creation is not allowed on weekends.');
-        return;
-      }
-    
-      // Open the modal with the clicked date for event creation
-      this.modalData = {
-        title: '',
-        startTime: '',
-        endTime: '',
-        selectedDate: arg.dateStr,
-        email : ''
-      };
-      this.showModal = true;
-    
+    // Prevent event creation on weekends
+    if (clickedDate.getDay() === 0 || clickedDate.getDay() === 6) {
+      alert('Event creation is not allowed on weekends.');
+      return;
+    }
+  
+    // Open the modal with the clicked date for event creation
+    this.modalData = {
+      title: '',
+      startTime: '',
+      endTime: '',
+      selectedDate: arg.dateStr,
+      email : ''
+    };
+    this.showModal = true;
   }
 
   handleEventClick(arg: any) {
-    // const eventId = arg.event.id;
-    // if (confirm('Do you want to edit this event?')) {
-    //   const title = prompt('Enter event title:');
-    //   if (title) {
-    //     const startTime = prompt('Enter start time (HH:mm):');
-    //     const endTime = prompt('Enter end time (HH:mm):');
-    //     if (startTime && endTime && this.isValidTimeFormat(startTime) && this.isValidTimeFormat(endTime)) {
-    //       const startDateTime = `${arg.event.startStr.split('T')[0]}T${startTime}:00`;
-    //       const endDateTime = `${arg.event.startStr.split('T')[0]}T${endTime}:00`;
-    //       const event = this.calendarComponent.getApi().getEventById(eventId);
-    //       if (event) {
-    //         event.setProp('title', title);
-    //         event.setStart(startDateTime);
-    //         event.setEnd(endDateTime);
-    //         localStorage.setItem('events', JSON.stringify(this.events));
-    //       }
-    //     } else {
-    //       alert('Invalid input. Please enter both start and end times in HH:mm format');
-    //     }
-    //   }
-    // }
     const eventId = arg.event.id;
 
     // Pre-fill modal data with the clicked event details
@@ -205,57 +144,60 @@ export class AddEventComponent implements OnInit, AfterViewInit {
     this.isMobile = window.innerWidth < 768;
   }
 
-
   closeModal(): void {
     this.showModal = false; // Close the modal by changing the visibility flag
   }
 
   createEventInCalendar(event: any) {
-    // Ensure the event is created with the correct format
+    const newEvent: EventInput = {
+      title: event.title,
+      start: `${event.selectedDate}T${event.startTime}:00`,
+      end: `${event.selectedDate}T${event.endTime}:00`,
+      allDay: false,
+      backgroundColor: 'blue',
+      extendedProps: { email: event.email }
+    };
+
     if (this.calendarComponent) {
       const calendarApi = this.calendarComponent.getApi();
-      const newEvent: EventInput = {
-        title: event.title,
-        start: `${event.selectedDate}T${event.startTime}:00`, 
-        end: `${event.selectedDate}T${event.endTime}:00`,     
-        email: event.email,                                    // Optional, if you need to store email
-        backgroundColor: 'blue',                               // Optional: Set event background color
-        textColor: 'white'                                     // Optional: Set text color for contrast
-      };
-  
-      // Add the event to the calendar
       calendarApi.addEvent(newEvent);
-  
-      // Optionally, you can update your local event list if needed
-      this.events = [...this.events, newEvent];
-  
-      // Optionally, save the event to localStorage or make an API call here to persist data
+      this.events.push(newEvent);
+      this.saveEventToFirestore(newEvent);
+      console.log('Event successfully added to the calendar:', newEvent);
     }
   }
-  
 
-  sendEventEmail(event :any) {
+  sendEventEmail(event: any) {
     console.log('Sending event email to:', event.email);
   }
 
   onSubmit(): void {
-    // Create the event object
     const newEvent = {
       title: this.modalData.title,
       startTime: this.modalData.startTime,
       endTime: this.modalData.endTime,
-      email: this.modalData.email,
+      selectedDate: this.modalData.selectedDate,
+      email: this.modalData.email
     };
 
-    // Send the event to your calendar service
+    console.log(newEvent, "newEventsubmit"),
     this.createEventInCalendar(newEvent);
-
-    // Send email notification to the provided email address
     this.sendEventEmail(newEvent);
-
     console.log('Event created:', this.modalData);
-    // You can add logic here to save the event, e.g., make an API call
-    this.closeModal(); // Close modal after submission
+    this.closeModal();
   }
-  
+
+  clearEvents() {
+    this.eventCollection.ref.get().then((snapshot) => {
+      snapshot.docs.forEach((doc) => {
+        this.eventCollection.doc(doc.id).delete();
+      });
+    });
+    this.events = [];
+    this.calendarOptions.events = this.events;
+  }
+
+  saveEventToFirestore(event: EventInput) {
+    this.eventCollection.add(event);
+  }
 }
